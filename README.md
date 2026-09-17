@@ -1,5 +1,7 @@
 # 航拍高斯工坊（AerialGS）
 
+GitHub：[AerialGS-gongfang](https://github.com/leeClancy/AerialGS-gongfang)（仓库名不能用汉字；简介为 **高斯工坊：用照片做三维高斯溅射**）。
+
 Windows 本地网页工具：用 HTML 界面控制照片整理、**COLMAP 4.2 CUDA** 特征处理、**COLMAP `global_mapper`（内置 GLOMAP）** 全局重建、**gsplat** GPU 训练，以及 Gaussian PLY **轻量预览**。地面绕拍、天空航拍、室内外序列都可以，不限无人机。
 
 项目从一次摄影专业采风作业长出来：12GB 显存上必须分块、顺序匹配、空地分开训。来龙去脉、拍摄参数和踩坑见 [docs/PROJECT_HISTORY.md](docs/PROJECT_HISTORY.md)。
@@ -97,7 +99,7 @@ powershell -ExecutionPolicy Bypass -File .\packaging\build_portable.ps1 -UpdateL
 - 组装可重定位目录 `dist/AerialGS-Portable/`（启动脚本只用包内相对路径；**不**把 `packaging/cache` 打进 app）
 - 安装 Python 3.10.11 embed + **PyTorch 2.4.1+cu124** + **官方预编译** `gsplat-1.5.3+pt24cu124-cp310-cp310-win_amd64.whl` + COLMAP 4.2 CUDA + GLOMAP 1.2
 - 包内写入第三方 `ARTIFACT_SHA256.txt`（不含 zip 自哈希）；外层 `dist/SHA256SUMS.txt` 另含 zip SHA256
-- 生成 `dist/AerialGS-Portable-win64.zip`（仅在本脚本成功结束后才存在）
+- 生成 `dist/AerialGS-Portable-win64.zip`（仅在本脚本成功结束后才存在）。GitHub 单文件上限 2GB，Release 会拆成 `.001` / `.002` 分卷，下载齐后运行合并脚本再解压。
 
 目标机解压后运行 `启动高斯工坊.bat`。首次启动只做本地自检，不联网。
 
