@@ -115,6 +115,16 @@ class ProjectStore:
             "ascii_names": [item["ascii_name"] for item in mapping],
         }
 
+    def delete(self, project_id: str, *, wipe_work: bool = True) -> dict[str, Any] | None:
+        project = self.get(project_id)
+        if not project:
+            return None
+        self.db.execute("DELETE FROM projects WHERE id=?", (project_id,))
+        if wipe_work:
+            work = Path(project["work_dir"])
+            shutil.rmtree(work, ignore_errors=True)
+        return project
+
 
 class JobStore:
     def __init__(self, db: Database) -> None:
@@ -231,6 +241,10 @@ class JobStore:
         self.db.execute("DELETE FROM logs WHERE job_id=?", (job_id,))
         self.db.execute("DELETE FROM stages WHERE job_id=?", (job_id,))
         self.db.execute("DELETE FROM jobs WHERE id=?", (job_id,))
+
+    def ids_for_project(self, project_id: str) -> list[str]:
+        rows = self.db.query("SELECT id FROM jobs WHERE project_id=?", (project_id,))
+        return [str(row["id"]) for row in rows]
 
 
 RESUME_GATE = {

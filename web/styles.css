@@ -300,7 +300,7 @@ button.ghost { color: var(--mute); }
 .ellipsis { grid-column: 1 / -1; text-align: center; color: var(--mute); font-size: 12px; padding: 4px 0; }
 
 .project-item {
-  display: flex; justify-content: space-between; gap: 12px;
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
   padding: 8px; border-radius: 8px; cursor: pointer;
 }
 .project-item:hover, .project-item.active { background: var(--panel-2); }

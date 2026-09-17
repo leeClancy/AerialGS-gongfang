@@ -322,12 +322,36 @@ def create_app(
         job["resume_stage"] = stage
         return job
 
-    @app.delete("/api/jobs/{job_id}")
-    def delete_job(job_id: str) -> dict[str, Any]:
+    def _delete_job(job_id: str) -> dict[str, Any]:
         job = jobs.get(job_id)
         if not job:
             raise HTTPException(404, "任务不存在")
         return queue.drop(job_id)
+
+    @app.post("/api/jobs/{job_id}/delete")
+    def delete_job_post(job_id: str) -> dict[str, Any]:
+        return _delete_job(job_id)
+
+    @app.delete("/api/jobs/{job_id}")
+    def delete_job(job_id: str) -> dict[str, Any]:
+        return _delete_job(job_id)
+
+    def _delete_project(project_id: str) -> dict[str, Any]:
+        project = projects.get(project_id)
+        if not project:
+            raise HTTPException(404, "项目不存在")
+        for job_id in jobs.ids_for_project(project_id):
+            queue.drop(job_id)
+        projects.delete(project_id, wipe_work=True)
+        return {"project_id": project_id, "deleted": True, "source_dir": project.get("source_dir")}
+
+    @app.post("/api/projects/{project_id}/delete")
+    def delete_project_post(project_id: str) -> dict[str, Any]:
+        return _delete_project(project_id)
+
+    @app.delete("/api/projects/{project_id}")
+    def delete_project(project_id: str) -> dict[str, Any]:
+        return _delete_project(project_id)
 
     @app.get("/api/jobs/{job_id}/logs")
     def job_logs(job_id: str, after: int = 0) -> dict[str, Any]:
@@ -474,17 +498,26 @@ def create_app(
 
     @app.post("/api/fs/pick-folders")
     def pick_source_folders() -> dict[str, Any]:
-        folders = pick_folders("选择一个或多个源图文件夹")
+        try:
+            folders = pick_folders("选择一个或多个源图文件夹")
+        except Exception as exc:
+            raise HTTPException(500, f"无法打开系统文件夹窗口：{exc}") from exc
         return {"paths": folders}
 
     @app.post("/api/fs/pick-folder")
     def pick_one_folder() -> dict[str, Any]:
-        folder = pick_folder("选择文件夹")
+        try:
+            folder = pick_folder("选择文件夹")
+        except Exception as exc:
+            raise HTTPException(500, f"无法打开系统文件夹窗口：{exc}") from exc
         return {"path": folder}
 
     @app.post("/api/fs/pick-file")
     def pick_one_file() -> dict[str, Any]:
-        path = pick_file("选择已下载的文件")
+        try:
+            path = pick_file("选择已下载的文件")
+        except Exception as exc:
+            raise HTTPException(500, f"无法打开系统文件窗口：{exc}") from exc
         return {"path": path}
 
     @app.post("/api/fs/drop")

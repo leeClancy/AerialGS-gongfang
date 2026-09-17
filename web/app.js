@@ -312,7 +312,9 @@ function renderProjects(items) {
         <div class="n">${esc(p.name || p.id)}</div>
         <div class="p">${esc(p.source_dir || "")}</div>
       </div>
-      <div class="p">${esc((p.created_at || "").slice(0, 19).replace("T", " "))}</div>
+      <div class="queue-actions">
+        <button type="button" class="ghost sm" data-act="delete">删除</button>
+      </div>
     </div>
   `).join("");
 }
@@ -587,7 +589,26 @@ $("btn-rerun").onclick = async () => {
 $("btn-clear-log").onclick = () => { $("logs").innerHTML = ""; };
 $("project-list").onclick = (ev) => {
   const item = ev.target.closest("[data-id]");
-  if (item) selectProject(item.dataset.id).catch((err) => toast(err.message, "bad"));
+  if (!item) return;
+  const actBtn = ev.target.closest("[data-act]");
+  if (actBtn && actBtn.dataset.act === "delete") {
+    ev.preventDefault();
+    ev.stopPropagation();
+    const projectId = item.dataset.id;
+    api(`/api/projects/${projectId}/delete`, { method: "POST", body: "{}" })
+      .then(() => {
+        if (state.projectId === projectId) {
+          state.projectId = null;
+          state.jobId = null;
+          $("logs").innerHTML = "";
+        }
+        toast("已删除项目");
+        return Promise.all([loadProjects(), refreshQueue()]);
+      })
+      .catch((err) => toast(err.message, "bad"));
+    return;
+  }
+  selectProject(item.dataset.id).catch((err) => toast(err.message, "bad"));
 };
 
 function parentPath(path) {
@@ -707,7 +728,7 @@ $("job-queue").onclick = (ev) => {
       return;
     }
     if (actBtn.dataset.act === "delete") {
-      api(`/api/jobs/${jobId}`, { method: "DELETE" })
+      api(`/api/jobs/${jobId}/delete`, { method: "POST", body: "{}" })
         .then(() => {
           if (state.jobId === jobId) {
             state.jobId = null;

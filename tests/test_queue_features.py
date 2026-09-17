@@ -180,7 +180,29 @@ def test_resume_keeps_cache_and_delete_removes_job(tmp_runtime, image_dir):
                 break
             time.sleep(0.1)
         assert finished["status"] == "succeeded", finished
-        gone = client.delete(f"/api/jobs/{job_id}")
+        gone = client.post(f"/api/jobs/{job_id}/delete")
         assert gone.status_code == 200
         assert client.get(f"/api/jobs/{job_id}").status_code == 404
         assert client.get("/api/jobs").json()["jobs"] == []
+
+
+def test_delete_project_removes_jobs(tmp_runtime, image_dir):
+    app = create_app(tmp_runtime, fake_runner=True)
+    with TestClient(app) as client:
+        created = client.post(
+            "/api/batch",
+            json={"source_dirs": [str(image_dir)], "preset": "fast", "run_training": False, "clear_cache": False},
+        )
+        assert created.status_code == 200, created.text
+        job_id = created.json()["jobs"][0]["id"]
+        project_id = created.json()["jobs"][0]["project_id"]
+        for _ in range(80):
+            done = client.get(f"/api/jobs/{job_id}").json()
+            if done["status"] in {"succeeded", "failed", "cancelled"}:
+                break
+            time.sleep(0.1)
+        deleted = client.post(f"/api/projects/{project_id}/delete")
+        assert deleted.status_code == 200, deleted.text
+        assert client.get(f"/api/projects/{project_id}").status_code == 404
+        assert client.get(f"/api/jobs/{job_id}").status_code == 404
+        assert client.get("/api/projects").json()["projects"] == []

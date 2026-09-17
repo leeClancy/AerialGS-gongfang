@@ -5,6 +5,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 import uuid
 from ctypes import HRESULT, POINTER, byref, c_void_p
 from ctypes.wintypes import DWORD, HWND, LPWSTR
@@ -20,6 +21,8 @@ SIGDN_FILESYSPATH = 0x80058000
 CLSCTX_INPROC_SERVER = 0x1
 COINIT_APARTMENTTHREADED = 0x2
 CREATE_NEW_PROCESS_GROUP = 0x00000200
+CREATE_NEW_CONSOLE = 0x00000010
+CREATE_BREAKAWAY_FROM_JOB = 0x01000000
 
 
 class GUID(ctypes.Structure):
@@ -112,10 +115,17 @@ def unique_dirs(paths: list[str]) -> list[str]:
 def pick_folders(title: str = "选择一个或多个文件夹", allow_multiple: bool = True) -> list[str]:
     if os.environ.get("AERIALGS_PICKER_CHILD") == "1":
         return _pick_folders_inline(title, allow_multiple=allow_multiple)
+    errors: list[str] = []
+    for picker in (_spawn_powershell_picker, _spawn_python_picker):
+        try:
+            return picker("folders" if allow_multiple else "folder", title, allow_multiple)
+        except Exception as exc:
+            errors.append(f"{picker.__name__}: {exc}")
     try:
-        return _spawn_picker("folders", title, allow_multiple=allow_multiple)
-    except Exception:
         return _pick_folders_inline(title, allow_multiple=allow_multiple)
+    except Exception as exc:
+        errors.append(str(exc))
+        raise RuntimeError("无法打开系统文件夹窗口：" + " | ".join(errors)) from exc
 
 
 def pick_folder(title: str = "选择文件夹") -> str | None:
@@ -126,56 +136,150 @@ def pick_folder(title: str = "选择文件夹") -> str | None:
 def pick_file(title: str = "选择文件", filetypes: tuple[tuple[str, str], ...] | None = None) -> str | None:
     if os.environ.get("AERIALGS_PICKER_CHILD") == "1":
         return _tk_pick_file(title, filetypes)
-    try:
-        picked = _spawn_picker("file", title, allow_multiple=False)
-        return picked[0] if picked else None
-    except Exception:
-        return _tk_pick_file(title, filetypes)
+    errors: list[str] = []
+    for picker in (_spawn_powershell_picker, _spawn_python_picker):
+        try:
+            picked = picker("file", title, False)
+            return picked[0] if picked else None
+        except Exception as exc:
+            errors.append(str(exc))
+    return _tk_pick_file(title, filetypes)
 
 
 def _app_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
-def _spawn_picker(mode: str, title: str, allow_multiple: bool) -> list[str]:
+def _powershell_exe() -> str:
+    root = os.environ.get("SystemRoot") or os.environ.get("WINDIR") or r"C:\Windows"
+    candidate = Path(root) / "System32" / "WindowsPowerShell" / "v1.0" / "powershell.exe"
+    if candidate.is_file():
+        return str(candidate)
+    return "powershell.exe"
+
+
+def _creation_flag_sets() -> list[int]:
+    if sys.platform != "win32":
+        return [0]
+    return [
+        CREATE_NEW_CONSOLE | CREATE_BREAKAWAY_FROM_JOB,
+        CREATE_NEW_CONSOLE,
+        CREATE_NEW_PROCESS_GROUP,
+        0,
+    ]
+
+
+def _read_picker_output(out_file: Path, *, want_dirs: bool) -> list[str]:
+    if not out_file.is_file():
+        return []
+    blob = out_file.read_text(encoding="utf-8-sig").strip()
+    if not blob:
+        return []
+    data = json.loads(blob)
+    if isinstance(data, list):
+        raw = [item for item in data if item]
+    elif isinstance(data, str):
+        raw = [data]
+    else:
+        raw = []
+    if want_dirs:
+        return unique_dirs(raw)
+    found: list[str] = []
+    for item in raw:
+        path = normalize_dropped_path(str(item))
+        if path is not None:
+            found.append(str(path))
+    return found
+
+
+def _run_picker_process(args: list[str], env: dict[str, str], cwd: str) -> None:
+    last_error: Exception | None = None
+    si = None
+    if sys.platform == "win32":
+        si = subprocess.STARTUPINFO()
+        si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        si.wShowWindow = 1
+        try:
+            ctypes.windll.user32.AllowSetForegroundWindow(-1)
+        except Exception:
+            pass
+    for flags in _creation_flag_sets():
+        try:
+            subprocess.run(
+                args,
+                timeout=3600,
+                env=env,
+                cwd=cwd,
+                stdin=subprocess.DEVNULL,
+                startupinfo=si,
+                creationflags=flags,
+            )
+            return
+        except OSError as exc:
+            last_error = exc
+            continue
+    if last_error:
+        raise last_error
+
+
+def _spawn_powershell_picker(mode: str, title: str, allow_multiple: bool) -> list[str]:
+    if sys.platform != "win32":
+        raise RuntimeError("powershell picker is Windows-only")
+    script = Path(__file__).with_name("folder_picker.ps1")
+    if not script.is_file():
+        raise FileNotFoundError(script)
+    handle = tempfile.NamedTemporaryFile(prefix="aerialgs-pick-", suffix=".json", delete=False)
+    out_file = Path(handle.name)
+    handle.close()
+    env = os.environ.copy()
+    env["AERIALGS_PICKER_TITLE"] = title
+    env["AERIALGS_PICKER_OUT"] = str(out_file)
+    env["AERIALGS_PICKER_MULTI"] = "1" if allow_multiple else "0"
+    args = [
+        _powershell_exe(),
+        "-NoLogo",
+        "-NoProfile",
+        "-STA",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        str(script),
+        "-Mode",
+        "file" if mode == "file" else "folders",
+        "-OutFile",
+        str(out_file),
+        "-Title",
+        title,
+    ]
+    try:
+        _run_picker_process(args, env, str(script.parent))
+        return _read_picker_output(out_file, want_dirs=mode != "file")
+    finally:
+        out_file.unlink(missing_ok=True)
+
+
+def _spawn_python_picker(mode: str, title: str, allow_multiple: bool) -> list[str]:
     env = os.environ.copy()
     root = str(_app_root())
     env["PYTHONPATH"] = os.pathsep.join(filter(None, [root, env.get("PYTHONPATH", "")]))
     env["AERIALGS_PICKER_CHILD"] = "1"
+    handle = tempfile.NamedTemporaryFile(prefix="aerialgs-pick-", suffix=".json", delete=False)
+    out_file = Path(handle.name)
+    handle.close()
+    env["AERIALGS_PICKER_OUT"] = str(out_file)
     args = [
         sys.executable,
-        "-m",
-        "backend.app.native_dialog",
+        str(Path(__file__).resolve()),
         mode,
         title,
         "1" if allow_multiple else "0",
+        str(out_file),
     ]
-    flags = CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0
     try:
-        ctypes.windll.user32.AllowSetForegroundWindow(-1)
-    except Exception:
-        pass
-    completed = subprocess.run(
-        args,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        timeout=3600,
-        env=env,
-        cwd=root,
-        creationflags=flags,
-    )
-    blob = (completed.stdout or "").strip()
-    if not blob:
-        err = (completed.stderr or "").strip()
-        if completed.returncode not in (0, None) and err:
-            raise RuntimeError(err.splitlines()[-1])
-        return []
-    data = json.loads(blob.splitlines()[-1])
-    if isinstance(data, list):
-        return [item for item in data if item]
-    return []
+        _run_picker_process(args, env, root)
+        return _read_picker_output(out_file, want_dirs=mode != "file")
+    finally:
+        out_file.unlink(missing_ok=True)
 
 
 def _pick_folders_inline(title: str, allow_multiple: bool = True) -> list[str]:
@@ -302,11 +406,15 @@ if __name__ == "__main__":
     mode = sys.argv[1] if len(sys.argv) > 1 else "folders"
     title = sys.argv[2] if len(sys.argv) > 2 else "选择文件夹"
     multi = (sys.argv[3] if len(sys.argv) > 3 else "1") != "0"
+    out_file = Path(sys.argv[4]) if len(sys.argv) > 4 else Path(os.environ.get("AERIALGS_PICKER_OUT") or "")
     _ensure_sta()
     if mode == "file":
         picked = _tk_pick_file(title)
-        json.dump([picked] if picked else [], sys.stdout, ensure_ascii=False)
+        payload = [picked] if picked else []
     else:
-        json.dump(_pick_folders_inline(title, allow_multiple=multi), sys.stdout, ensure_ascii=False)
-    sys.stdout.write("\n")
+        payload = _pick_folders_inline(title, allow_multiple=multi)
+    text = json.dumps(payload, ensure_ascii=False)
+    if str(out_file):
+        out_file.write_text(text, encoding="utf-8")
+    sys.stdout.write(text + "\n")
     sys.stdout.flush()
