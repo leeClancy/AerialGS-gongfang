@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>高斯工坊</title>
+  <link rel="stylesheet" href="/styles.css?v=15" />
+</head>
+<body>
+  <header class="mast">
+    <div>
+      <p class="kicker">Local studio · 127.0.0.1</p>
+      <h1>高斯工坊</h1>
+    </div>
+    <div class="mast-meta">
+      <span id="job-chip">待命</span>
+      <span id="hw-badge">正在读取机器</span>
+    </div>
+  </header>
+
+  <main class="page">
+    <section class="specs" id="metrics">
+      <div class="spec"><span class="k">GPU</span><strong class="v">正在检测</strong><span class="s">nvidia-smi</span></div>
+      <div class="spec"><span class="k">显存</span><strong class="v">—</strong><span class="s">特征与训练</span></div>
+      <div class="spec"><span class="k">CPU / 磁盘</span><strong class="v">—</strong><span class="s">GLOMAP 走 CPU</span></div>
+      <div class="spec"><span class="k">运行时</span><strong class="v">正在检测</strong><span class="s">PyTorch / gsplat</span></div>
+    </section>
+    <section class="notices" id="alerts"></section>
+
+    <div class="sheet">
+      <section>
+        <header class="sec">
+          <h2>导入照片</h2>
+          <p>地面绕拍、天空航拍、室内外序列都可以。可一次加入多个文件夹，跑完一个再导入也行。失败会自动跳过并继续下一个。</p>
+        </header>
+        <div class="field">
+          <span class="field-title">源图文件夹 <em>可多个 · 可继续添加 · 拖入或系统窗口</em></span>
+          <div id="source-drop" class="dropzone">
+            <p>把文件夹拖到这里，或点浏览。会弹出 Windows 系统选文件夹窗口，可多选。浏览器拿不到路径时会自动再弹出这个窗口。</p>
+            <div class="path-row">
+              <button type="button" id="btn-browse-source" class="ghost">浏览</button>
+              <button type="button" id="btn-clear-sources" class="ghost">清空</button>
+            </div>
+            <div id="source-chips" class="chips empty">还没有文件夹。</div>
+          </div>
+        </div>
+        <label>工作目录 <em>建议短英文路径，可空</em>
+          <div class="path-row">
+            <input id="work" placeholder="C:\AerialGS-Cache\job1" />
+            <button type="button" id="btn-browse-work" class="ghost">浏览</button>
+          </div>
+        </label>
+        <label>排序 <button type="button" class="help" data-tip="按文件名：img2 会排在 img10 前。按拍摄时间：文件名乱、但相机写了时间时用。">?</button>
+          <select id="sort">
+            <option value="filename" selected>按文件名</option>
+            <option value="exif_time">按拍摄时间</option>
+          </select>
+        </label>
+        <div id="preview" class="well empty">选好目录后可预览顺序，也可直接开始。</div>
+        <h3>最近</h3>
+        <div id="project-list" class="well empty">没有记录。</div>
+      </section>
+
+      <section>
+        <header class="sec">
+          <h2>参数</h2>
+          <p>先选一档。匹配、重建、训练会连续做完；多个文件夹排队，失败自动跳过。</p>
+        </header>
+
+        <input type="hidden" id="preset" value="balanced" />
+        <div class="preset-bar" role="radiogroup" aria-label="质量预设">
+          <button type="button" class="preset-btn" data-preset="fast">低<small>快预览</small></button>
+          <button type="button" class="preset-btn on" data-preset="balanced">中<small>12GB 默认</small></button>
+          <button type="button" class="preset-btn" data-preset="quality">高<small>更细更慢</small></button>
+        </div>
+        <p id="preset-lead" class="preset-lead">缩小 4 倍 · 1.5 万步 · 约 450 万高斯 · COLMAP 中等</p>
+
+        <details class="fold">
+          <summary>匹配</summary>
+          <label>模式 <button type="button" class="help" data-tip="自动：图少穷举、图多改顺序。顺序：只跟相邻几张比，连续拍摄最快。穷举：每张都和其他所有图配对，最稳也最慢。">?</button>
+            <select id="match">
+              <option value="auto" selected>自动 · 小图集穷举，大图集顺序</option>
+              <option value="sequential">顺序匹配 · 连续拍摄</option>
+              <option value="exhaustive">穷举匹配 · 更稳更慢</option>
+            </select>
+          </label>
+          <div class="row compact">
+            <label>跟前后几张比 <button type="button" class="help" data-tip="只在顺序匹配时有用。10 表示每张图跟前面 10 张、后面 10 张对一下，不只跟下一张。越大越稳，也越慢。">?</button>
+              <input id="overlap" type="number" value="10" min="1" />
+            </label>
+            <label class="check"><input id="quad" type="checkbox" checked /> 再跟远一点的比 <button type="button" class="help" data-tip="旁边对完，再抽几张隔得更远的对一下。走着走着位置会慢慢偏，对远一点能把偏掉的拉回来。">?</button></label>
+            <label class="check"><input id="loop" type="checkbox" checked /> 第一张和最后几张再比对 <button type="button" class="help" data-tip="绕着拍了一圈、飞完又回到起点时打开；直线走过就不必开。">?</button></label>
+          </div>
+        </details>
+
+        <details class="fold">
+          <summary>重建</summary>
+          <label>相机模型 <button type="button" class="help" data-tip="SIMPLE_RADIAL：普通镜头首选。OPENCV：广角、画面边缘明显弯曲。PINHOLE：照片已经去过畸变。SIMPLE_PINHOLE：最简针孔，畸变可忽略时用。">?</button>
+            <select id="camera">
+              <option value="SIMPLE_RADIAL" selected>SIMPLE_RADIAL · 普通镜头首选</option>
+              <option value="OPENCV">OPENCV · 广角 / 畸变大</option>
+              <option value="PINHOLE">PINHOLE · 已去畸变</option>
+              <option value="SIMPLE_PINHOLE">SIMPLE_PINHOLE · 最简针孔</option>
+            </select>
+          </label>
+          <label>后端 <button type="button" class="help" data-tip="默认用 COLMAP 4.2 内置 GLOMAP，大序列通常比逐步重建快。独立 GLOMAP 1.2 是同类算法的另一个可执行文件，前者跑不通时再试。">?</button>
+            <select id="mapper">
+              <option value="colmap_global" selected>COLMAP 4.2 global_mapper · 默认</option>
+              <option value="glomap">独立 GLOMAP 1.2</option>
+            </select>
+          </label>
+          <label>最大特征数 <button type="button" class="help" data-tip="每张图最多提多少个特征点。越大越稳、越慢。航拍/地面一般 2048–8192。会被上面的低中高带动。">?</button>
+            <input id="features" type="number" value="4096" />
+          </label>
+          <label class="check"><input id="single-cam" type="checkbox" checked /> 当成同一台相机 <button type="button" class="help" data-tip="默认开着：这批图是同一台无人机或同一部手机拍的，焦距按一套参数估。混了不同镜头或焦段再关。">?</button></label>
+          <label class="check"><input id="fallback" type="checkbox" checked /> 全局重建失败时改用逐步重建 <button type="button" class="help" data-tip="全局法失败后，再走更慢的增量重建，尽量把这批图救回来。">?</button></label>
+        </details>
+
+        <details class="fold">
+          <summary>训练</summary>
+          <div class="row compact">
+            <label>缩小倍数 <button type="button" class="help" data-tip="分辨率缩小倍数。4 表示用 1/4 边长训练，越省显存。低档 8，中档 4，高档 2。">?</button>
+              <input id="factor" type="number" value="4" min="1" />
+            </label>
+            <label>步数 <button type="button" class="help" data-tip="训练迭代次数。越多通常越细，也越久。低 7 千，中 1.5 万，高 3 万。">?</button>
+              <input id="steps" type="number" value="15000" min="100" />
+            </label>
+            <label>策略 <button type="button" class="help" data-tip="Default：按梯度克隆、分裂高斯，大多数场景用这个。MCMC：随机搬迁加点，复杂或很空的场景有时更匀，通常更吃显存。">?</button>
+              <select id="strategy">
+                <option value="default" selected>Default · 标准加密</option>
+                <option value="mcmc">MCMC · 随机搬迁加点</option>
+              </select>
+            </label>
+          </div>
+          <label class="check"><input id="do-train" type="checkbox" checked /> 重建后训练 gsplat <button type="button" class="help" data-tip="关掉则只做位姿和点云，不生成高斯。">?</button></label>
+        </details>
+
+        <details class="fold">
+          <summary>高级 · 训练</summary>
+          <div class="row compact">
+            <label>最大高斯数 <button type="button" class="help" data-tip="场景里最多保留多少个点。0 表示不限制。低约 180 万，中 450 万，高 840 万。">?</button>
+              <input id="max-splats" type="number" value="4500000" min="0" />
+            </label>
+            <label>梯度阈值 <button type="button" class="help" data-tip="加点的敏感度。越大加点越少、越省显存。">?</button>
+              <input id="grow-grad" type="number" value="0.0002" min="0" step="0.0001" />
+            </label>
+            <label>球谐阶数 <button type="button" class="help" data-tip="越高，高光和视角变化越细，也越吃显存。低档 0 仅颜色，中档 1，高档 3。">?</button>
+              <select id="sh-degree">
+                <option value="0">0 · 仅颜色</option>
+                <option value="1" selected>1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+              </select>
+            </label>
+          </div>
+          <div class="row compact">
+            <label class="check"><input id="coarse-fine" type="checkbox" checked /> 由粗到细 <button type="button" class="help" data-tip="训练前期只用低阶颜色，后期再加细节，通常更稳。">?</button></label>
+            <label>透明度重置间隔 <button type="button" class="help" data-tip="每隔这么多步把过不透明的点打回去。0 表示不重置。低/中档关闭，高档 3000。">?</button>
+              <input id="opacity-reset" type="number" value="0" min="0" />
+            </label>
+          </div>
+        </details>
+
+        <details class="fold">
+          <summary>高级 · COLMAP</summary>
+          <label>特征质量 <button type="button" class="help" data-tip="同时改特征数、最长边、最大匹配数。一般跟上面的低中高走；要微调再选自定义。">?</button>
+            <select id="sfm-quality">
+              <option value="low" data-features="2048" data-size="1000" data-matches="8192">低 · 更快更省</option>
+              <option value="medium" selected data-features="4096" data-size="1600" data-matches="16384">中 · 常用</option>
+              <option value="high" data-features="8192" data-size="3200" data-matches="32768">高 · 更稳更慢</option>
+              <option value="custom">自定义</option>
+            </select>
+          </label>
+          <div class="row compact">
+            <label>线程数 <button type="button" class="help" data-tip="0 表示按 CPU 自动。只影响匹配/重建，不改你的源图。">?</button>
+              <input id="num-threads" type="number" value="0" min="0" />
+            </label>
+            <label>最长边像素 <button type="button" class="help" data-tip="提特征前把图缩到这个最长边。0 表示不缩放。不改源图。">?</button>
+              <input id="max-image-size" type="number" value="1600" min="0" />
+            </label>
+            <label>最大匹配数 <button type="button" class="help" data-tip="每对图像最多保留多少条匹配。越大越稳越慢。">?</button>
+              <input id="max-matches" type="number" value="16384" min="0" />
+            </label>
+          </div>
+          <label class="check"><input id="undistort" type="checkbox" checked /> 重建后去畸变 <button type="button" class="help" data-tip="训练前建议开着。关掉则用未去畸变的图训练。">?</button></label>
+        </details>
+
+        <details class="fold">
+          <summary>缓存</summary>
+          <label class="check"><input id="clear-cache" type="checkbox" checked /> 跑完清掉中间缓存 <button type="button" class="help" data-tip="匹配库、重建和训练中间文件会删掉，PLY 结果留下来，避免磁盘被撑满。关掉则全部保留，方便从某阶段重跑。">?</button></label>
+        </details>
+
+        <div class="runbar">
+          <button id="btn-run" class="primary">加入队列并开始</button>
+          <button type="button" id="btn-create" class="ghost">只预览顺序</button>
+          <p id="run-hint" class="hint">可一次加入多个文件夹。正在跑时再点浏览还能继续往队列里加。失败会自动跳过。</p>
+        </div>
+      </section>
+    </div>
+
+    <section class="band">
+      <header class="sec">
+        <h2>流水线</h2>
+        <p id="queue">尚未提交。失败或中断的任务可续跑，不需要的可删除。</p>
+        <div id="job-queue" class="queue-list empty">队列空。</div>
+      </header>
+      <ol class="flow" id="flow">
+        <li data-flow="import">照片</li>
+        <li data-flow="match">匹配 <small>GPU</small></li>
+        <li data-flow="recon">重建 <small>CPU</small></li>
+        <li data-flow="train">训练 <small>GPU</small></li>
+      </ol>
+      <div id="progress" class="progress"><i id="progress-bar"></i></div>
+      <div id="stages" class="stages"></div>
+      <div class="row actions">
+        <button id="btn-cancel" class="ghost">取消</button>
+        <label class="inline">从该阶段重跑
+          <select id="rerun-stage">
+            <option value="prepare_images">整理图片 · CPU</option>
+            <option value="feature_extract">特征提取 · GPU</option>
+            <option value="feature_match">特征匹配 · GPU</option>
+            <option value="view_graph_calibrator">视图图标定 · CPU</option>
+            <option value="global_mapper">全局重建 · CPU</option>
+            <option value="glomap_mapper">独立 GLOMAP · CPU</option>
+            <option value="validate_model">模型检查 · CPU</option>
+            <option value="undistort_scene">去畸变 · CPU</option>
+            <option value="export_scene">导出场景 · CPU</option>
+            <option value="train_gsplat">gsplat 训练 · GPU</option>
+          </select>
+        </label>
+        <button id="btn-rerun" class="ghost">重跑</button>
+      </div>
+    </section>
+
+    <div class="sheet lower">
+      <section>
+        <header class="sec rowish">
+          <h2>日志</h2>
+          <button type="button" id="btn-clear-log" class="ghost">清空</button>
+        </header>
+        <div id="logs" class="log"></div>
+      </section>
+      <section>
+        <header class="sec">
+          <h2>结果</h2>
+        </header>
+        <div id="results" class="well empty">完成后显示模型与耗时。</div>
+        <a id="viewer-link" class="text-link" href="#" hidden target="_blank">打开预览</a>
+      </section>
+    </div>
+  </main>
+
+  <div id="toast" class="toast" hidden></div>
+  <div id="picker" class="modal" hidden>
+    <div class="dialog">
+      <header class="sec rowish">
+        <h2>选择文件夹</h2>
+        <button type="button" id="picker-close" class="ghost">关闭</button>
+      </header>
+      <div class="drive-row" id="drives"></div>
+      <div class="path-row">
+        <input id="picker-path" />
+        <button type="button" id="picker-up" class="ghost">上级</button>
+        <button type="button" id="picker-go" class="ghost">打开</button>
+      </div>
+      <div id="picker-list" class="picker-list"></div>
+      <div class="row">
+        <button type="button" id="picker-choose" class="primary">使用此目录</button>
+      </div>
+    </div>
+  </div>
+  <div id="runtime-setup" class="modal" hidden>
+    <div class="dialog runtime-dialog">
+      <header class="sec">
+        <h2>准备运行时</h2>
+        <p id="runtime-lead">首次启动会自动下载 COLMAP、PyTorch CUDA 和 gsplat。这些二进制不进开源仓库。</p>
+      </header>
+      <div class="progress"><i id="runtime-bar"></i></div>
+      <p id="runtime-msg" class="hint">正在检查…</p>
+      <div id="runtime-items" class="rt-list"></div>
+      <div id="runtime-manual" class="rt-manual" hidden>
+        <h3>自动下载失败 · 请手动下载</h3>
+        <p class="hint">用浏览器打开下面的地址，下到任意文件夹后点「选择已下载的文件」。校验通过会继续安装。</p>
+        <div id="runtime-manual-list"></div>
+        <div class="row">
+          <button type="button" id="runtime-open-cache" class="ghost">打开缓存目录</button>
+          <button type="button" id="runtime-retry" class="ghost">重新自动下载</button>
+        </div>
+      </div>
+      <div class="row" id="runtime-actions">
+        <button type="button" id="runtime-relaunch" class="primary" hidden>重启以启用 GPU</button>
+        <button type="button" id="runtime-close" class="ghost" hidden>关闭</button>
+      </div>
+    </div>
+  </div>
+  <script src="/app.js?v=15"></script>
+</body>
+</html>

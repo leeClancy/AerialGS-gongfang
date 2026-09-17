@@ -1,0 +1,18 @@
+# 便携包 Python 依赖（由 packaging/build_portable.ps1 安装）
+# 不要在此列出 gsplat：必须安装官方预编译 win_amd64 wheel，而不是 PyPI 的 py3-none-any。
+# 不要列出 pyceres：可能破坏 Windows 上 pycolmap / gsplat wheel。
+--extra-index-url https://download.pytorch.org/whl/cu124
+torch==2.4.1+cu124
+torchvision==0.19.1+cu124
+pycolmap==3.11.1
+numpy==1.26.4
+scipy==1.14.1
+pillow==10.4.0
+fastapi==0.115.12
+uvicorn==0.32.1
+starlette==0.46.2
+pydantic==2.10.6
+jaxtyping==0.2.34
+rich==13.9.4
+typing_extensions==4.12.2
+websockets==14.2

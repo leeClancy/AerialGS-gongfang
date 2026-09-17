@@ -1,0 +1,97 @@
+{
+  "name": "AerialGS",
+  "display_name": "航拍高斯工坊",
+  "portable_name": "AerialGS-Portable-win64",
+  "python": {
+    "version": "3.10.11",
+    "url": "https://www.python.org/ftp/python/3.10.11/python-3.10.11-embed-amd64.zip",
+    "sha256": "608619f8619075629c9c69f361352a0da6ed7e62f83a0e19c63e0ea32eb7629d",
+    "md5": "f1c0538b060e03cbb697ab3581cb73bc",
+    "filename": "python-3.10.11-embed-amd64.zip",
+    "mirrors": [
+      "https://repo.huaweicloud.com/python/3.10.11/python-3.10.11-embed-amd64.zip",
+      "https://mirrors.huaweicloud.com/python/3.10.11/python-3.10.11-embed-amd64.zip"
+    ]
+  },
+  "get_pip": {
+    "url": "https://bootstrap.pypa.io/get-pip.py",
+    "mirrors": [
+      "https://mirrors.aliyun.com/pypi/get-pip.py",
+      "https://mirrors.cloud.tencent.com/pypi/get-pip.py"
+    ],
+    "filename": "get-pip.py",
+    "sha256": null
+  },
+  "mirrors": {
+    "github_prefixes": [
+      "https://ghfast.top/",
+      "https://gh-proxy.com/",
+      "https://mirror.ghproxy.com/"
+    ],
+    "pypi": [
+      "https://pypi.tuna.tsinghua.edu.cn/simple",
+      "https://mirrors.aliyun.com/pypi/simple",
+      "https://pypi.org/simple"
+    ]
+  },
+  "colmap": {
+    "version": "4.2.0",
+    "url": "https://github.com/colmap/colmap/releases/download/4.2.0/colmap-x64-windows-cuda.zip",
+    "sha256": "991e0bae403a496fcc4de0c1f1f428619bf12f8000978f77bc6799d9bfeac23e",
+    "filename": "colmap-x64-windows-cuda.zip",
+    "bytes": 380970811
+  },
+  "glomap": {
+    "version": "1.2.0",
+    "url": "https://github.com/colmap/glomap/releases/download/1.2.0/glomap-x64-windows-cuda.zip",
+    "sha256": "7b32a8b0ecfaec28b82d5e0b7d40e38198259849ad1af8ba3e34dab301a3a773",
+    "filename": "glomap-x64-windows-cuda.zip",
+    "bytes": 73572171,
+    "note": "独立 GLOMAP 1.2 仅作兼容适配入口；默认重建使用 COLMAP 4.2 global_mapper（内置 GLOMAP）。"
+  },
+  "vocab_tree": {
+    "version": "faiss-flickr100K-32K",
+    "url": "https://github.com/colmap/colmap/releases/download/3.11.1/vocab_tree_faiss_flickr100K_words32K.bin",
+    "filename": "vocab_tree_faiss_flickr100K_words32K.bin",
+    "bytes": 9477067,
+    "sha256": null,
+    "note": "COLMAP 4.x 顺序匹配回环检测使用 FAISS 词袋。构建脚本下载后写入 sha256。"
+  },
+  "python_packages": {
+    "index_url": "https://pypi.org/simple",
+    "extra_index_url": "https://download.pytorch.org/whl/cu124",
+    "torch": "2.4.1+cu124",
+    "torchvision": "0.19.1+cu124",
+    "gsplat": "1.5.3+pt24cu124",
+    "gsplat_wheel_filename": "gsplat-1.5.3+pt24cu124-cp310-cp310-win_amd64.whl",
+    "gsplat_wheel_url": "https://github.com/nerfstudio-project/gsplat/releases/download/v1.5.3/gsplat-1.5.3%2Bpt24cu124-cp310-cp310-win_amd64.whl",
+    "gsplat_sha256": "62fae62e2cf233233527ba890fd322825476118edd4bd27a4e6cb36b1723003e",
+    "torch_wheel_filename": "torch-2.4.1+cu124-cp310-cp310-win_amd64.whl",
+    "torch_wheel_url": "https://download.pytorch.org/whl/cu124/torch-2.4.1%2Bcu124-cp310-cp310-win_amd64.whl",
+    "torch_wheel_mirrors": [
+      "https://mirrors.aliyun.com/pytorch-wheels/cu124/torch-2.4.1+cu124-cp310-cp310-win_amd64.whl"
+    ],
+    "torchvision_wheel_filename": "torchvision-0.19.1+cu124-cp310-cp310-win_amd64.whl",
+    "torchvision_wheel_url": "https://download.pytorch.org/whl/cu124/torchvision-0.19.1%2Bcu124-cp310-cp310-win_amd64.whl",
+    "torchvision_wheel_mirrors": [
+      "https://mirrors.aliyun.com/pytorch-wheels/cu124/torchvision-0.19.1+cu124-cp310-cp310-win_amd64.whl"
+    ],
+    "pycolmap": "3.11.1",
+    "numpy": "1.26.4",
+    "scipy": "1.14.1",
+    "pillow": "10.4.0",
+    "fastapi": "0.115.12",
+    "uvicorn": "0.32.1",
+    "jaxtyping": "0.2.34",
+    "rich": "13.9.4"
+  },
+  "cuda": {
+    "torch_channel": "cu124",
+    "note": "目标电脑只需兼容的 NVIDIA 驱动，不需要 CUDA Toolkit。gsplat 使用官方预编译 Windows wheel（pt24cu124），打包机不应再现场编译 CUDA。"
+  },
+  "notes": [
+    "便携包体积为数 GB（PyTorch CUDA + COLMAP CUDA + GLOMAP + 预编译 gsplat）。本仓库不包含该 zip。",
+    "必须运行 packaging/build_portable.ps1 之后才存在发布包；未运行前不得声称已经生成。",
+    "GLOMAP / COLMAP global_mapper 的位姿与全局优化主要在 CPU 上运行。"
+  ]
+}

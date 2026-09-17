@@ -1,0 +1,2 @@
+# 源码开发（不含 PyTorch / gsplat）。完整训练栈由 packaging/build_portable.ps1 按固定版本安装。
+-r requirements-dev.txt
