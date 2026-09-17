@@ -66,13 +66,31 @@ class ProjectStore:
         )
         return payload
 
+    def _with_image_count(self, item: dict[str, Any]) -> dict[str, Any]:
+        work = Path(item.get("work_dir") or "")
+        preview_path = work / "source_preview.json"
+        if preview_path.is_file():
+            try:
+                records = json.loads(preview_path.read_text(encoding="utf-8"))
+                if isinstance(records, list) and records:
+                    item["image_count"] = len(records)
+                    return item
+            except (OSError, json.JSONDecodeError):
+                pass
+        images_dir = work / "images"
+        if images_dir.is_dir():
+            item["image_count"] = sum(1 for path in images_dir.iterdir() if path.is_file())
+        else:
+            item["image_count"] = int(item.get("image_count") or 0)
+        return item
+
     def list_projects(self) -> list[dict[str, Any]]:
         rows = self.db.query("SELECT * FROM projects ORDER BY created_at DESC")
         result = []
         for row in rows:
             item = dict(row)
             item["settings"] = json.loads(item.pop("settings_json") or "{}")
-            result.append(item)
+            result.append(self._with_image_count(item))
         return result
 
     def get(self, project_id: str) -> dict[str, Any] | None:
@@ -81,7 +99,7 @@ class ProjectStore:
             return None
         item = dict(row)
         item["settings"] = json.loads(item.pop("settings_json") or "{}")
-        return item
+        return self._with_image_count(item)
 
     def preview_order(self, project_id: str, sort_mode: str) -> dict[str, Any]:
         project = self.get(project_id)

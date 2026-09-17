@@ -121,6 +121,21 @@ def create_app(
     installer = RuntimeInstaller(paths)
     app.state.installer = installer
 
+    def decorate_job(job: dict[str, Any]) -> dict[str, Any]:
+        project = projects.get(job["project_id"])
+        if project:
+            job["source_dir"] = project.get("source_dir")
+            job["project_name"] = project.get("name")
+            result = job.get("result") if isinstance(job.get("result"), dict) else {}
+            prepared = result.get("prepared") if isinstance(result.get("prepared"), dict) else {}
+            job["image_count"] = int(
+                result.get("image_count")
+                or prepared.get("image_count")
+                or project.get("image_count")
+                or 0
+            )
+        return job
+
     @app.on_event("startup")
     async def _startup() -> None:
         queue.bind_loop(asyncio.get_running_loop())
@@ -265,10 +280,7 @@ def create_app(
                 preview = pipeline.preview_commands(project["id"], params)
                 jobs.update(job["id"], result={"command_preview": preview})
                 queue.enqueue(job["id"])
-                item = jobs.get(job["id"])
-                item["source_dir"] = project["source_dir"]
-                item["project_name"] = project["name"]
-                item["image_count"] = project["image_count"]
+                item = decorate_job(jobs.get(job["id"]))
                 created.append(item)
             except (FileNotFoundError, ValueError, OSError) as exc:
                 skipped.append({"source_dir": folder, "error": str(exc)})
@@ -276,12 +288,7 @@ def create_app(
 
     @app.get("/api/jobs")
     def list_jobs(project_id: str | None = None) -> dict[str, Any]:
-        items = jobs.list_jobs(project_id)
-        for job in items:
-            project = projects.get(job["project_id"])
-            if project:
-                job["source_dir"] = project.get("source_dir")
-                job["project_name"] = project.get("name")
+        items = [decorate_job(job) for job in jobs.list_jobs(project_id)]
         return {"jobs": items, "queue": queue.status()}
 
     @app.get("/api/jobs/{job_id}")
@@ -289,6 +296,7 @@ def create_app(
         job = jobs.get(job_id)
         if not job:
             raise HTTPException(404, "任务不存在")
+        job = decorate_job(job)
         job["queue"] = queue.status()
         return job
 

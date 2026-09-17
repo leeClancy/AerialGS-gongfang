@@ -376,6 +376,10 @@ class Pipeline:
             }
 
         image_count = int(prepared["image_count"])
+        current = self.jobs.get(job_id) or {}
+        result = dict(current.get("result") or {})
+        result["image_count"] = image_count
+        self.jobs.update(job_id, result=result)
         colmap = self.paths.colmap_exe
         if colmap is None:
             raise PipelineError("未找到 COLMAP 可执行文件", stage="feature_extract")
@@ -550,6 +554,7 @@ class Pipeline:
             train_stats["ply"] = str(ply_candidates[-1]) if ply_candidates else None
 
         return {
+            "image_count": image_count,
             "prepared": prepared,
             "reconstruction": selected,
             "used_incremental_fallback": used_fallback,

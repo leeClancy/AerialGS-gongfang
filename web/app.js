@@ -37,6 +37,9 @@ const state = {
   toastedJob: null,
   followLive: true,
   applyingPreset: false,
+  lastJob: null,
+  imageCount: 0,
+  imageCountProject: null,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -254,6 +257,8 @@ function filmItems(list, offset = 0, projectId = null) {
 
 function renderPreview(project) {
   const count = project.image_count || project.count || 0;
+  state.imageCount = count;
+  state.imageCountProject = project.id || state.projectId;
   const head = project.preview || (project.images || []).slice(0, 8);
   const tail = project.preview_tail || ((project.images || []).length > 8 ? (project.images || []).slice(-4) : []);
   const showTail = count > head.length && tail.length;
@@ -319,27 +324,63 @@ function renderProjects(items) {
   `).join("");
 }
 
-function elapsedLabel(started) {
-  if (!started) return "";
-  const ms = Date.now() - Date.parse(started);
+function parseTs(value) {
+  if (!value) return NaN;
+  const ms = Date.parse(value);
+  return Number.isFinite(ms) ? ms : NaN;
+}
+
+function formatDuration(ms) {
   if (!Number.isFinite(ms) || ms < 0) return "";
-  const sec = Math.round(ms / 1000);
-  if (sec < 60) return `${sec}s`;
-  const min = Math.floor(sec / 60);
-  const rem = sec % 60;
-  return rem ? `${min}分${rem}秒` : `${min}分钟`;
+  const sec = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  if (h) return `${h}小时${m}分${String(s).padStart(2, "0")}秒`;
+  if (m) return `${m}分${String(s).padStart(2, "0")}秒`;
+  return `${s}秒`;
+}
+
+function stageDurationMs(stage, now) {
+  const start = parseTs(stage.started_at);
+  if (!Number.isFinite(start)) return NaN;
+  if (stage.status === "running") return Math.max(0, now - start);
+  const end = parseTs(stage.finished_at);
+  return Math.max(0, (Number.isFinite(end) ? end : now) - start);
+}
+
+function jobDurationMs(job, stages, now) {
+  let start = parseTs(job.started_at);
+  if (!Number.isFinite(start)) start = parseTs(job.created_at);
+  if (!Number.isFinite(start)) {
+    const starts = stages.map((s) => parseTs(s.started_at)).filter(Number.isFinite);
+    start = starts.length ? Math.min(...starts) : NaN;
+  }
+  if (!Number.isFinite(start)) return NaN;
+  const live = job.status === "running" || job.status === "queued";
+  const end = live ? now : (parseTs(job.finished_at) || now);
+  return Math.max(0, end - start);
 }
 
 function stageStatusText(stage) {
   const base = STATUS_LABEL[stage.status] || stage.status || "等待";
   if (stage.status !== "running") return base;
-  const elapsed = elapsedLabel(stage.started_at);
   const noPct = ["global_mapper", "glomap_mapper", "view_graph_calibrator", "incremental_mapper"].includes(stage.name);
-  if (noPct) return `CPU 求解中，无百分比${elapsed ? " · 已 " + elapsed : ""}`;
-  return elapsed ? `${base} · ${elapsed}` : base;
+  return noPct ? "CPU 求解中，无百分比" : base;
+}
+
+function stageTimeText(stage, now) {
+  if (!stage.started_at) return "未开始";
+  const label = formatDuration(stageDurationMs(stage, now));
+  if (!label) return "未开始";
+  if (stage.status === "succeeded") return `用时 ${label}`;
+  if (stage.status === "running") return `已用 ${label}`;
+  return `已用 ${label}`;
 }
 
 function renderStages(job) {
+  state.lastJob = job;
+  const now = Date.now();
   const stages = job.stages && job.stages.length
     ? job.stages
     : IDLE_STAGES.map((name) => ({ name, device: STAGE_META[name].device, status: "pending" }));
@@ -355,6 +396,7 @@ function renderStages(job) {
           <span class="dev ${esc(s.device || meta.device)}">${esc(s.device || meta.device)}</span>
         </div>
         <div class="st">${esc(stageStatusText(s))}</div>
+        <div class="tm">${esc(stageTimeText(s, now))}</div>
       </div>
     `;
   }).join("");
@@ -366,8 +408,27 @@ function renderStages(job) {
 
   const queued = job.queue?.queued;
   const wait = Array.isArray(queued) ? queued.length : 0;
+  const imageCount = Number(job.image_count ?? state.imageCount ?? 0);
+  const total = formatDuration(jobDurationMs(job, stages, now));
+  const current = stages.find((s) => s.status === "running");
+  const currentTime = current ? formatDuration(stageDurationMs(current, now)) : "";
+  const metaBox = $("pipeline-meta");
+  if (metaBox) {
+    const bits = [
+      `<span>一共 <strong>${imageCount || "—"}</strong> 张图</span>`,
+      `<span>总耗时 <strong>${total || "—"}</strong></span>`,
+    ];
+    if (current && currentTime) {
+      bits.push(`<span>当前阶段 <strong>${esc(STAGE_META[current.name]?.label || current.name)} ${currentTime}</strong></span>`);
+    }
+    metaBox.innerHTML = bits.join("");
+    metaBox.hidden = false;
+  }
   if (job.id) {
-    $("queue").textContent = `任务 ${job.id} · ${STATUS_LABEL[job.status] || job.status || "待命"} · 当前 ${STAGE_META[job.current_stage]?.label || job.current_stage || "-"} · 进度 ${pct}% · 等待 ${wait}`;
+    const extras = [`进度 ${pct}%`, `等待 ${wait}`];
+    if (imageCount) extras.unshift(`${imageCount} 张`);
+    if (total) extras.push(`总耗时 ${total}`);
+    $("queue").textContent = `任务 ${job.id} · ${STATUS_LABEL[job.status] || job.status || "待命"} · 当前 ${STAGE_META[job.current_stage]?.label || job.current_stage || "-"} · ${extras.join(" · ")}`;
   }
   const chip = $("job-chip");
   chip.textContent = job.status ? `${STATUS_LABEL[job.status] || job.status}${job.current_stage ? " · " + (STAGE_META[job.current_stage]?.label || job.current_stage) : ""}` : "待命";
@@ -426,6 +487,27 @@ async function refreshJob() {
   await refreshQueue();
   if (!state.jobId) return;
   const job = await api(`/api/jobs/${state.jobId}`);
+  if (job.image_count != null && job.image_count !== "") {
+    state.imageCount = Number(job.image_count) || 0;
+    state.imageCountProject = job.project_id;
+  } else if (job.project_id && state.imageCountProject !== job.project_id) {
+    try {
+      const project = await api(`/api/projects/${job.project_id}`);
+      let count = Number(project.image_count) || 0;
+      if (!count) {
+        const preview = await api(`/api/projects/${job.project_id}/preview`, {
+          method: "POST",
+          body: JSON.stringify({ sort_mode: "filename" }),
+        });
+        count = Number(preview.count) || 0;
+      }
+      state.imageCount = count;
+      state.imageCountProject = job.project_id;
+      job.image_count = state.imageCount;
+    } catch {}
+  } else if (state.imageCount) {
+    job.image_count = state.imageCount;
+  }
   renderStages(job);
   if (job.status === "succeeded" && state.projectId) await refreshResults();
   if (job.status === "failed" && job.error && state.toastedJob !== job.id) {
@@ -1076,6 +1158,9 @@ async function boot() {
     }
   } catch {}
   setInterval(() => refreshJob().catch(() => {}), 2000);
+  setInterval(() => {
+    if (state.lastJob && state.lastJob.status === "running") renderStages(state.lastJob);
+  }, 1000);
 }
 
 boot();

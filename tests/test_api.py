@@ -49,6 +49,7 @@ def test_api_create_status_and_fake_job(tmp_runtime, image_dir):
                 break
             time.sleep(0.1)
         assert body["status"] == "succeeded", body
+        assert body.get("image_count") == 3
         logs = client.get(f"/api/jobs/{job_id}/logs").json()["logs"]
         assert any("feature_extract" in row["line"] or "GPU" in row["line"] for row in logs)
         results = client.get(f"/api/projects/{project_id}/results")

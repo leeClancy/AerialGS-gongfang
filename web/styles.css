@@ -349,6 +349,20 @@ button.ghost { color: var(--mute); }
 }
 .progress i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--gpu), var(--run)); transition: width .25s ease; }
 
+.pipeline-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin: -2px 0 12px;
+  font-size: 13px;
+  color: var(--mute);
+}
+.pipeline-meta strong {
+  color: var(--ink);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
 .stages { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
 .stage {
   background: #0d1117;
@@ -368,6 +382,12 @@ button.ghost { color: var(--mute); }
 .dev.GPU { background: #12352f; color: var(--gpu); }
 .dev.CPU { background: #3a2d16; color: var(--cpu); }
 .stage .st { margin-top: 6px; color: var(--mute); }
+.stage .tm {
+  margin-top: 2px;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.stage.pending .tm { color: var(--mute); }
 .stage.succeeded { border-color: #245c40; }
 .stage.running { border-color: var(--run); animation: pulse 1.4s ease infinite; }
 .stage.failed, .stage.cancelled { border-color: #5a2a2a; }
