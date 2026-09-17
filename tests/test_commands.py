@@ -33,8 +33,8 @@ def test_feature_extractor_single_camera_gpu():
     assert cmd[cmd.index("--FeatureExtraction.gpu_index") + 1] == "0"
     assert cmd[cmd.index("--SiftExtraction.max_num_features") + 1] == "4096"
     sized = feature_extractor_cmd("c", "d", "i", max_image_size=1600, num_threads=8)
-    assert sized[sized.index("--SiftExtraction.max_image_size") + 1] == "1600"
-    assert sized[sized.index("--SiftExtraction.num_threads") + 1] == "8"
+    assert sized[sized.index("--FeatureExtraction.max_image_size") + 1] == "1600"
+    assert sized[sized.index("--FeatureExtraction.num_threads") + 1] == "8"
     assert "--SiftExtraction.use_gpu" not in cmd
     assert "--SiftMatching.use_gpu" not in cmd
     assert all(not item.startswith("cmd.exe") for item in cmd)

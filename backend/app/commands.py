@@ -52,9 +52,9 @@ def feature_extractor_cmd(
         str(max_num_features),
     ]
     if max_image_size:
-        cmd.extend(["--SiftExtraction.max_image_size", str(int(max_image_size))])
+        cmd.extend(["--FeatureExtraction.max_image_size", str(int(max_image_size))])
     if num_threads:
-        cmd.extend(["--SiftExtraction.num_threads", str(int(num_threads))])
+        cmd.extend(["--FeatureExtraction.num_threads", str(int(num_threads))])
     return cmd
 
 
@@ -78,9 +78,9 @@ def exhaustive_matcher_cmd(
         str(gpu_index),
     ]
     if max_num_matches:
-        cmd.extend(["--SiftMatching.max_num_matches", str(int(max_num_matches))])
+        cmd.extend(["--FeatureMatching.max_num_matches", str(int(max_num_matches))])
     if num_threads:
-        cmd.extend(["--SiftMatching.num_threads", str(int(num_threads))])
+        cmd.extend(["--FeatureMatching.num_threads", str(int(num_threads))])
     return cmd
 
 
@@ -120,9 +120,9 @@ def sequential_matcher_cmd(
         str(int(loop_detection_num_images)),
     ]
     if max_num_matches:
-        cmd.extend(["--SiftMatching.max_num_matches", str(int(max_num_matches))])
+        cmd.extend(["--FeatureMatching.max_num_matches", str(int(max_num_matches))])
     if num_threads:
-        cmd.extend(["--SiftMatching.num_threads", str(int(num_threads))])
+        cmd.extend(["--FeatureMatching.num_threads", str(int(num_threads))])
     if loop_detection and vocab_tree_path:
         cmd.extend(["--SequentialMatching.vocab_tree_path", str(vocab_tree_path)])
     return cmd
