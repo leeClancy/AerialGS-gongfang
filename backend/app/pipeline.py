@@ -432,6 +432,7 @@ class Pipeline:
             )
             if should_run("glomap_mapper"):
                 _reset_output_dir(sparse_dir)
+                log("独立 GLOMAP 同样没有百分比进度，主要在 CPU 上算。")
                 self._run_stage(job_id, "glomap_mapper", glomap_cmd, log, cancel_event)
                 log("GLOMAP 主要求解在 CPU 上运行，不是全 GPU 重建")
         else:
@@ -444,6 +445,7 @@ class Pipeline:
             )
             if should_run("global_mapper"):
                 _reset_output_dir(sparse_dir)
+                log("全局重建是 CPU 非线性优化，COLMAP 不给百分比。日志还在刷就说明还在算，属正常。")
                 self._run_stage(job_id, "global_mapper", global_cmd, log, cancel_event)
                 log("COLMAP global_mapper 内置 GLOMAP：位姿与全局优化主要使用 CPU")
         if not sparse_dir.exists():

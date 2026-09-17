@@ -57,7 +57,7 @@ class CreateJobBody(BaseModel):
     run_training: bool = True
     use_gpu: bool = True
     gpu_index: int = 0
-    max_splats: int = 4500000
+    max_splats: int = 1500000
     grow_grad2d: float = 0.0002
     sh_degree: int = 3
     coarse_to_fine: bool = True

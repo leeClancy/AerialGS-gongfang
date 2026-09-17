@@ -1,8 +1,13 @@
 @echo off
+chcp 65001 >nul
 setlocal
 cd /d "%~dp0"
 set "AERIALGS_HOST=127.0.0.1"
 set "AERIALGS_PORT=8765"
+echo.
+echo [高斯工坊] 正在启动，请等待服务加载完成后再进入网页。
+echo [高斯工坊] 请不要关闭本窗口。
+echo.
 
 if exist "%~dp0runtime\python\python.exe" (
   set "LAUNCH_ROOT=%~dp0"
@@ -18,7 +23,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0bootstrap.ps1"
 exit /b %ERRORLEVEL%
 
 :DEV
-echo [AerialGS] Starting local UI. Missing COLMAP/CUDA will download after the page opens.
+echo [高斯工坊] 开发模式启动中，请稍候……
 set "AERIALGS_ROOT=%~dp0"
 "%~dp0.venv\Scripts\python.exe" "%~dp0backend\run.py" --host 127.0.0.1 --port 8765
 exit /b %ERRORLEVEL%

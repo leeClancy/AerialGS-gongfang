@@ -13,7 +13,9 @@ Windows 本地网页工具：用 HTML 界面控制照片整理、**COLMAP 4.2 CU
 ## 界面里现在能做什么
 
 - **低 / 中 / 高**三档预设，同时套训练和 COLMAP 相关参数；分类折叠；标题旁问号悬停说明。
-- 一次加入多个源图文件夹（系统选文件夹窗口，可多选），支持拖入；训练中途还能继续往队列里加。失败自动跳过下一个。失败或中断的任务可续跑，队列里可删除。
+- 一次加入多个源图文件夹（页面内选目录，可多选），支持拖入；训练中途还能继续往队列里加。失败自动跳过下一个。失败或中断的任务可续跑，队列里可删除。
+- 启动脚本会等服务健康检查通过后再打开浏览器，并提示不要关黑窗口。
+- 进度条按「已完成阶段 / 总阶段」计算。COLMAP `global_mapper` / GLOMAP 是 CPU 非线性优化，**不会给出可靠百分比**；该阶段只显示已运行时间和日志。
 - 默认每个文件夹**成功跑完**后清中间缓存，PLY 留在 `output/`；失败会留缓存以便续跑。
 - 只绑定 `127.0.0.1`。源图可以含中文路径，不改原图。工作目录建议 ASCII 短路径。
 
@@ -81,7 +83,7 @@ powershell -ExecutionPolicy Bypass -File .\bootstrap.ps1
 5. 默认 `colmap global_mapper`（COLMAP 4.2 内置 GLOMAP）。独立 **GLOMAP 1.2** 仅作为兼容适配入口。重跑 mapper 前会清空对应 sparse 输出。
 6. 在多个稀疏模型中选择注册图像最多的一个；注册率过低则阻止训练。增量 mapper 只作回退。
 7. 使用 COLMAP `image_undistorter` 一次性生成无畸变训练图和 PINHOLE 模型，再整理 `images/`、`images_2/`、`images_4/` 与 `sparse/0/`。
-8. gsplat 训练预设：低 / 中 / 高。12GB 默认「中」为 **factor=4、15000 步、约 450 万高斯**。写出检查点与标准 Gaussian PLY。CUDA OOM 会给出可执行建议，而不是假装训完。
+8. gsplat 训练预设：低 / 中 / 高。12GB 默认「中」为 **factor=4、15000 步、约 150 万高斯**。写出检查点与标准 Gaussian PLY。CUDA OOM 会给出可执行建议，而不是假装训完。
 
 训练适配层使用 `pycolmap.Reconstruction`（失败时回退到本仓库解析器），**不会伪造训练**。场景会做相似变换归一化；DefaultStrategy 按 gsplat 1.5.3 传入 `scene_scale` 与 `absgrad`。
 

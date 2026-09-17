@@ -293,7 +293,7 @@ def default_job_params(overrides: dict[str, Any] | None = None) -> dict[str, Any
         "save_steps": preset.get("save_steps", [preset["max_steps"]]),
         "save_ply": True,
         "run_training": True,
-        "max_splats": int(preset.get("max_splats", 4500000)),
+        "max_splats": int(preset.get("max_splats", 1500000)),
         "grow_grad2d": float(preset.get("grow_grad2d", 0.0002)),
         "sh_degree": int(preset.get("sh_degree", 3)),
         "coarse_to_fine": bool(preset.get("coarse_to_fine", True)),

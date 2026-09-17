@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>高斯工坊</title>
-  <link rel="stylesheet" href="/styles.css?v=17" />
+  <link rel="stylesheet" href="/styles.css?v=19" />
 </head>
 <body>
   <header class="mast">
@@ -73,7 +73,7 @@
           <button type="button" class="preset-btn on" data-preset="balanced">中<small>12GB 默认</small></button>
           <button type="button" class="preset-btn" data-preset="quality">高<small>更细更慢</small></button>
         </div>
-        <p id="preset-lead" class="preset-lead">缩小 4 倍 · 1.5 万步 · 约 450 万高斯 · COLMAP 中等</p>
+        <p id="preset-lead" class="preset-lead">缩小 4 倍 · 1.5 万步 · 约 150 万高斯 · COLMAP 中等</p>
 
         <details class="fold">
           <summary>匹配</summary>
@@ -138,8 +138,8 @@
         <details class="fold">
           <summary>高级 · 训练</summary>
           <div class="row compact">
-            <label>最大高斯数 <button type="button" class="help" data-tip="场景里最多保留多少个点。0 表示不限制。低约 180 万，中 450 万，高 840 万。">?</button>
-              <input id="max-splats" type="number" value="4500000" min="0" />
+            <label>最大高斯数 <button type="button" class="help" data-tip="场景里最多保留多少个点。0 表示不限制。低 50 万，中 150 万，高 300 万。">?</button>
+              <input id="max-splats" type="number" value="1500000" min="0" />
             </label>
             <label>梯度阈值 <button type="button" class="help" data-tip="加点的敏感度。越大加点越少、越省显存。">?</button>
               <input id="grow-grad" type="number" value="0.0002" min="0" step="0.0001" />
@@ -201,7 +201,7 @@
     <section class="band">
       <header class="sec">
         <h2>流水线</h2>
-        <p id="queue">尚未提交。失败或中断的任务可续跑，不需要的可删除。</p>
+        <p id="queue">尚未提交。失败或中断的任务可续跑，不需要的可删除。全局重建没有百分比，看日志是否还在刷。</p>
         <div id="job-queue" class="queue-list empty">队列空。</div>
       </header>
       <ol class="flow" id="flow">
@@ -293,6 +293,6 @@
       </div>
     </div>
   </div>
-  <script src="/app.js?v=17"></script>
+  <script src="/app.js?v=19"></script>
 </body>
 </html>

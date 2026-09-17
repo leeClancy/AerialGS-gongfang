@@ -3,6 +3,10 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+import threading
+import time
+import urllib.error
+import urllib.request
 import webbrowser
 from pathlib import Path
 
@@ -37,6 +41,23 @@ def _launch_root() -> Path:
     return keep_usable_path(APP_DIR)
 
 
+def _wait_then_open_browser(url: str, timeout_sec: float = 120) -> None:
+    health = url.rstrip("/") + "/api/health"
+    print("正在启动高斯工坊，请稍候，不要关闭这个黑窗口……", flush=True)
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    deadline = time.time() + timeout_sec
+    while time.time() < deadline:
+        try:
+            with opener.open(health, timeout=1.5) as resp:
+                if getattr(resp, "status", 200) == 200:
+                    print("服务已就绪，正在打开网页。", flush=True)
+                    webbrowser.open(url)
+                    return
+        except (urllib.error.URLError, TimeoutError, OSError):
+            time.sleep(0.3)
+    print(f"等待超时。请手动在浏览器打开 {url}", flush=True)
+
+
 ROOT = prefer_ascii_root(_launch_root())
 os.environ["AERIALGS_ROOT"] = str(ROOT)
 
@@ -63,11 +84,14 @@ def main() -> None:
             f"改用 http://{args.host}:{port}/"
         )
     webbrowser_url = f"http://{args.host}:{port}/"
+    print(f"稍后将打开 {webbrowser_url}", flush=True)
     if not args.no_browser:
-        try:
-            webbrowser.open(webbrowser_url)
-        except Exception:
-            pass
+        threading.Thread(
+            target=_wait_then_open_browser,
+            args=(webbrowser_url,),
+            name="aerialgs-open-browser",
+            daemon=True,
+        ).start()
     uvicorn.run(
         "backend.app.main:create_app",
         host=args.host,

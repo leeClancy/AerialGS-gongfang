@@ -319,6 +319,26 @@ function renderProjects(items) {
   `).join("");
 }
 
+function elapsedLabel(started) {
+  if (!started) return "";
+  const ms = Date.now() - Date.parse(started);
+  if (!Number.isFinite(ms) || ms < 0) return "";
+  const sec = Math.round(ms / 1000);
+  if (sec < 60) return `${sec}s`;
+  const min = Math.floor(sec / 60);
+  const rem = sec % 60;
+  return rem ? `${min}分${rem}秒` : `${min}分钟`;
+}
+
+function stageStatusText(stage) {
+  const base = STATUS_LABEL[stage.status] || stage.status || "等待";
+  if (stage.status !== "running") return base;
+  const elapsed = elapsedLabel(stage.started_at);
+  const noPct = ["global_mapper", "glomap_mapper", "view_graph_calibrator", "incremental_mapper"].includes(stage.name);
+  if (noPct) return `CPU 求解中，无百分比${elapsed ? " · 已 " + elapsed : ""}`;
+  return elapsed ? `${base} · ${elapsed}` : base;
+}
+
 function renderStages(job) {
   const stages = job.stages && job.stages.length
     ? job.stages
@@ -334,7 +354,7 @@ function renderStages(job) {
           <strong>${esc(meta.label)}</strong>
           <span class="dev ${esc(s.device || meta.device)}">${esc(s.device || meta.device)}</span>
         </div>
-        <div class="st">${esc(STATUS_LABEL[s.status] || s.status || "等待")}</div>
+        <div class="st">${esc(stageStatusText(s))}</div>
       </div>
     `;
   }).join("");
@@ -798,35 +818,35 @@ const PRESET_FILL = {
   fast: {
     factor: 8,
     steps: 7000,
-    maxSplats: 1800000,
+    maxSplats: 500000,
     grow: 0.0009,
     sh: 0,
     coarse: true,
     opacity: 0,
     sfm: "low",
-    lead: "缩小 8 倍 · 7 千步 · 约 180 万高斯 · COLMAP 低",
+    lead: "缩小 8 倍 · 7 千步 · 约 50 万高斯 · COLMAP 低",
   },
   balanced: {
     factor: 4,
     steps: 15000,
-    maxSplats: 4500000,
+    maxSplats: 1500000,
     grow: 0.0002,
     sh: 1,
     coarse: true,
     opacity: 0,
     sfm: "medium",
-    lead: "缩小 4 倍 · 1.5 万步 · 约 450 万高斯 · COLMAP 中 · 12GB 默认",
+    lead: "缩小 4 倍 · 1.5 万步 · 约 150 万高斯 · COLMAP 中 · 12GB 默认",
   },
   quality: {
     factor: 2,
     steps: 30000,
-    maxSplats: 8400000,
+    maxSplats: 3000000,
     grow: 0.0002,
     sh: 3,
     coarse: true,
     opacity: 3000,
     sfm: "high",
-    lead: "缩小 2 倍 · 3 万步 · 约 840 万高斯 · COLMAP 高",
+    lead: "缩小 2 倍 · 3 万步 · 约 300 万高斯 · COLMAP 高",
   },
 };
 
