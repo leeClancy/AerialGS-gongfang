@@ -196,6 +196,8 @@ def test_delete_project_removes_jobs(tmp_runtime, image_dir):
         assert created.status_code == 200, created.text
         job_id = created.json()["jobs"][0]["id"]
         project_id = created.json()["jobs"][0]["project_id"]
+        work = Path(client.get(f"/api/projects/{project_id}").json()["work_dir"])
+        assert work.is_dir()
         for _ in range(80):
             done = client.get(f"/api/jobs/{job_id}").json()
             if done["status"] in {"succeeded", "failed", "cancelled"}:
@@ -203,6 +205,8 @@ def test_delete_project_removes_jobs(tmp_runtime, image_dir):
             time.sleep(0.1)
         deleted = client.post(f"/api/projects/{project_id}/delete")
         assert deleted.status_code == 200, deleted.text
+        assert deleted.json().get("cache", {}).get("wiped") is True
+        assert not work.exists()
         assert client.get(f"/api/projects/{project_id}").status_code == 404
         assert client.get(f"/api/jobs/{job_id}").status_code == 404
         assert client.get("/api/projects").json()["projects"] == []

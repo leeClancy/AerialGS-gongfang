@@ -602,7 +602,7 @@ $("project-list").onclick = (ev) => {
           state.jobId = null;
           $("logs").innerHTML = "";
         }
-        toast("已删除项目");
+        toast("已删除项目和工作缓存");
         return Promise.all([loadProjects(), refreshQueue()]);
       })
       .catch((err) => toast(err.message, "bad"));
@@ -622,7 +622,9 @@ async function openPicker(targetId) {
   state.pickerTarget = targetId;
   state.pickerMode = "dir";
   $("picker").hidden = false;
-  const current = $(targetId).value || "F:\\";
+  let current = "F:\\";
+  if (targetId === "source" && state.sourceDirs[0]) current = state.sourceDirs[0];
+  else if (targetId && $(targetId) && $(targetId).value) current = $(targetId).value;
   $("picker-path").value = current;
   $("drives").innerHTML = ["C:\\", "D:\\", "E:\\", "F:\\", "G:\\"].map((d) => `<button type="button" class="ghost sm drive">${d}</button>`).join("");
   await loadPicker(current);
@@ -645,55 +647,11 @@ async function loadPicker(path) {
   }
 }
 
-async function pickFoldersNative() {
-  toast("正在打开系统文件夹窗口，请看任务栏或其它屏幕");
-  const data = await api("/api/fs/pick-folders", { method: "POST", body: "{}" });
-  return data.paths || [];
-}
-
-async function pickFolderNative() {
-  toast("正在打开系统文件夹窗口，请看任务栏或其它屏幕");
-  const data = await api("/api/fs/pick-folder", { method: "POST", body: "{}" });
-  return data.path || "";
-}
-
-function collectDropPayload(dt) {
-  const paths = [];
-  if (!dt) return { paths, text: "" };
-  for (const file of dt.files || []) {
-    if (file.path) paths.push(file.path);
-    else if (file.name && /[\\/]/.test(file.name)) paths.push(file.name);
-  }
-  if (dt.items) {
-    for (const item of dt.items) {
-      const file = item.getAsFile && item.getAsFile();
-      if (file && file.path) paths.push(file.path);
-    }
-  }
-  const text = [
-    dt.getData("text/uri-list"),
-    dt.getData("text/plain"),
-    dt.getData("application/x-moz-file"),
-  ].filter(Boolean).join("\n");
-  return { paths, text };
-}
-
-$("btn-browse-source").onclick = async () => {
-  try {
-    const paths = await pickFoldersNative();
-    if (paths.length) addSources(paths);
-    else toast("没有选择文件夹");
-  } catch (err) {
-    toast(err.message, "bad");
-  }
+$("btn-browse-source").onclick = () => {
+  openPicker("source").catch((err) => toast(err.message, "bad"));
 };
-$("btn-browse-work").onclick = async () => {
-  try {
-    const path = await pickFolderNative();
-    if (path) $("work").value = path;
-  } catch (err) {
-    toast(err.message, "bad");
-  }
+$("btn-browse-work").onclick = () => {
+  openPicker("work").catch((err) => toast(err.message, "bad"));
 };
 $("btn-clear-sources").onclick = () => {
   state.sourceDirs = [];
@@ -734,8 +692,8 @@ $("job-queue").onclick = (ev) => {
             state.jobId = null;
             $("logs").innerHTML = "";
           }
-          toast("已删除任务");
-          return refreshQueue();
+          toast("已删除任务和工作缓存");
+          return Promise.all([loadProjects(), refreshQueue()]);
         })
         .catch((err) => toast(err.message, "bad"));
       return;
@@ -748,6 +706,27 @@ $("job-queue").onclick = (ev) => {
   connectLogs(state.jobId);
   refreshJob().catch((err) => toast(err.message, "bad"));
 };
+
+function collectDropPayload(dt) {
+  const paths = [];
+  if (!dt) return { paths, text: "" };
+  for (const file of dt.files || []) {
+    if (file.path) paths.push(file.path);
+    else if (file.name && /[\\/]/.test(file.name)) paths.push(file.name);
+  }
+  if (dt.items) {
+    for (const item of dt.items) {
+      const file = item.getAsFile && item.getAsFile();
+      if (file && file.path) paths.push(file.path);
+    }
+  }
+  const text = [
+    dt.getData("text/uri-list"),
+    dt.getData("text/plain"),
+    dt.getData("application/x-moz-file"),
+  ].filter(Boolean).join("\n");
+  return { paths, text };
+}
 
 function bindDrop(el) {
   if (!el) return;
@@ -767,10 +746,8 @@ function bindDrop(el) {
         addSources(data.paths);
         return;
       }
-      toast("浏览器没给出路径，改为打开系统窗口");
-      const picked = await pickFoldersNative();
-      if (picked.length) addSources(picked);
-      else toast("没有选择文件夹");
+      toast("浏览器没给出路径，请用浏览选文件夹");
+      await openPicker("source");
     } catch (err) {
       toast(err.message, "bad");
     }
@@ -798,7 +775,9 @@ $("picker-list").onclick = (ev) => {
 };
 $("picker-choose").onclick = () => {
   if (state.pickerMode === "file") return;
-  if (state.pickerTarget) $(state.pickerTarget).value = $("picker-path").value;
+  const path = $("picker-path").value;
+  if (state.pickerTarget === "source") addSources([path]);
+  else if (state.pickerTarget && $(state.pickerTarget)) $(state.pickerTarget).value = path;
   $("picker").hidden = true;
 };
 $("picker").addEventListener("click", (ev) => {

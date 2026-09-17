@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import os
 import shutil
+import stat
+import time
 from pathlib import Path
 from typing import Any
 
@@ -52,3 +55,39 @@ def purge_work_cache(work: Path | str) -> dict[str, Any]:
         if folder.exists():
             shutil.rmtree(folder, ignore_errors=True)
     return {"output": str(output), "kept": kept}
+
+
+def _unlock(func, path, _exc_info) -> None:
+    try:
+        os.chmod(path, stat.S_IWRITE)
+        func(path)
+    except OSError:
+        pass
+
+
+def remove_work_tree(work: Path | str, *, source_dir: str | None = None) -> dict[str, Any]:
+    """Delete a project's entire work cache, including PLY output. Never touch the source photos."""
+    root = Path(work)
+    source = Path(source_dir) if source_dir else None
+    try:
+        resolved = root.resolve()
+    except OSError:
+        resolved = root
+    if source is not None:
+        try:
+            if resolved == source.resolve() or resolved == source:
+                return {"wiped": False, "path": str(root), "error": "工作目录和原片目录相同，已跳过"}
+        except OSError:
+            pass
+    if not root.exists():
+        return {"wiped": True, "path": str(root), "error": None}
+    last_error = None
+    for _ in range(8):
+        try:
+            shutil.rmtree(root, onerror=_unlock)
+        except OSError as exc:
+            last_error = str(exc)
+        if not root.exists():
+            return {"wiped": True, "path": str(root), "error": None}
+        time.sleep(0.15)
+    return {"wiped": not root.exists(), "path": str(root), "error": last_error}

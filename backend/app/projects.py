@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import shutil
 import threading
 import uuid
 from datetime import datetime, timezone
@@ -11,6 +10,7 @@ from typing import Any, Callable
 from backend.app.config import PRESETS, RuntimePaths
 from backend.app.db import Database
 from backend.app.images import inspect_images, materialize_work_images, sort_records
+from backend.app.cache import remove_work_tree
 
 
 def utcnow() -> str:
@@ -121,8 +121,7 @@ class ProjectStore:
             return None
         self.db.execute("DELETE FROM projects WHERE id=?", (project_id,))
         if wipe_work:
-            work = Path(project["work_dir"])
-            shutil.rmtree(work, ignore_errors=True)
+            project["cache"] = remove_work_tree(project["work_dir"], source_dir=project.get("source_dir"))
         return project
 
 

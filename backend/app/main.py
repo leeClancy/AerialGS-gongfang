@@ -326,7 +326,14 @@ def create_app(
         job = jobs.get(job_id)
         if not job:
             raise HTTPException(404, "任务不存在")
-        return queue.drop(job_id)
+        project_id = job["project_id"]
+        queue.drop(job_id)
+        leftover = jobs.ids_for_project(project_id)
+        cache = None
+        if not leftover:
+            removed = projects.delete(project_id, wipe_work=True)
+            cache = (removed or {}).get("cache")
+        return {"job_id": job_id, "deleted": True, "project_id": project_id, "project_deleted": not leftover, "cache": cache}
 
     @app.post("/api/jobs/{job_id}/delete")
     def delete_job_post(job_id: str) -> dict[str, Any]:
@@ -342,8 +349,15 @@ def create_app(
             raise HTTPException(404, "项目不存在")
         for job_id in jobs.ids_for_project(project_id):
             queue.drop(job_id)
-        projects.delete(project_id, wipe_work=True)
-        return {"project_id": project_id, "deleted": True, "source_dir": project.get("source_dir")}
+        removed = projects.delete(project_id, wipe_work=True)
+        cache = (removed or {}).get("cache") or {}
+        return {
+            "project_id": project_id,
+            "deleted": True,
+            "source_dir": project.get("source_dir"),
+            "work_dir": project.get("work_dir"),
+            "cache": cache,
+        }
 
     @app.post("/api/projects/{project_id}/delete")
     def delete_project_post(project_id: str) -> dict[str, Any]:
